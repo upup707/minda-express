@@ -2,6 +2,8 @@
 民大速递帮 · 云端版 — Flask 后端
 校园快递代取平台，支持多用户注册登录、发单、接单、实时推送
 """
+import eventlet
+  eventlet.monkey_patch()
 import sqlite3
 import os
 import hashlib

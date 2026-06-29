@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+minda.db
+server.log
+.venv/
+venv/
+.env

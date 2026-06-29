@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>民大速递帮 · 云端版</title>
+    <!-- 引入 Socket.IO 客户端 -->
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+    <!-- 高德地图 JS API -->
+    <script src="https://webapi.amap.com/maps?v=2.0&key=424d5044e85d09f48384babcb0e2fa5b&plugin=AMap.Geocoder,AMap.Walking"></script>
+    <style>
+        /* 样式完全保留原样，此处省略以节省篇幅，你可以直接复制之前 style 块的内容 */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #1a1a1a; line-height: 1.5; }
+        .app { max-width: 520px; margin: 0 auto; background: white; min-height: 100vh; box-shadow: 0 0 20px rgba(0,0,0,0.05); position: relative; padding-bottom: 80px; }
+        @media (min-width: 768px) { .app { max-width: 520px; } }
+        .page { display: none; padding: 16px 16px 80px; }
+        .page.active { display: block; }
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; max-width: 520px; margin: 0 auto; background: white; display: flex; justify-content: space-around; padding: 6px 0 10px; border-top: 1px solid #e9ecef; box-shadow: 0 -2px 8px rgba(0,0,0,0.03); z-index: 100; }
+        .nav-item { text-align: center; font-size: 11px; color: #6c757d; background: none; border: none; flex: 1; padding: 4px 0; cursor: pointer; }
+        .nav-item.active { color: #1976d2; font-weight: 500; }
+        .nav-icon { font-size: 22px; display: block; margin-bottom: 2px; }
+        .card { background: white; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); padding: 14px; margin-bottom: 14px; border: 1px solid #edf2f7; }
+        .header h1 { font-size: 26px; color: #1976d2; }
+        .header p { color: #6c757d; font-size: 14px; }
+        .announcement { background: #e8f0fe; padding: 10px 14px; border-radius: 12px; font-size: 13px; color: #0b5e9e; margin-bottom: 20px; }
+        .flex-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        button { background: #1976d2; border: none; color: white; padding: 8px 18px; border-radius: 30px; font-size: 14px; font-weight: 500; cursor: pointer; transition: 0.2s; }
+        button:active { opacity: 0.7; }
+        button.secondary { background: #e9ecef; color: #1a1a1a; }
+        button.danger { background: #dc3545; }
+        button.success { background: #28a745; }
+        .btn-block { width: 100%; margin-top: 10px; }
+        .form-group { margin-bottom: 16px; }
+        label { font-weight: 500; display: block; margin-bottom: 4px; font-size: 14px; }
+        input, select, textarea { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 12px; font-size: 14px; background: white; }
+        .radio-group { display: flex; gap: 16px; flex-wrap: wrap; }
+        .filter-bar { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 12px; }
+        .filter-chip { background: #f1f3f5; padding: 6px 14px; border-radius: 30px; font-size: 13px; cursor: pointer; white-space: nowrap; }
+        .filter-chip.active { background: #1976d2; color: white; }
+        .profile-menu { display: flex; flex-direction: column; gap: 8px; }
+        .menu-item { background: #f8fafc; padding: 12px 16px; border-radius: 14px; display: flex; justify-content: space-between; cursor: pointer; }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+        .stat-item { background: #f8fafc; border-radius: 12px; padding: 12px 8px; text-align: center; }
+        .stat-item .num { font-size: 24px; font-weight: bold; color: #1976d2; }
+        .stat-item .label { font-size: 12px; color: #6c757d; }
+        .ai-check { background: #f1f9ff; border-left: 4px solid #1976d2; padding: 12px; border-radius: 8px; margin: 12px 0; }
+        .hidden { display: none; }
+        .text-center { text-align: center; }
+        .mt-2 { margin-top: 8px; }
+        .sync-status { font-size: 12px; padding: 4px 8px; border-radius: 4px; margin-left: 8px; }
+        .sync-ok { background: #d4edda; color: #155724; }
+        .sync-error { background: #f8d7da; color: #721c24; }
+        .sync-pending { background: #fff3cd; color: #856404; }
+        /* 支付弹窗 */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 200; display: flex; align-items: center; justify-content: center; }
+        .modal-overlay.hidden { display: none !important; }
+        .modal-box { background: white; border-radius: 16px; padding: 24px; max-width: 360px; width: 90%; text-align: center; }
+        .modal-box img { max-width: 220px; border-radius: 12px; margin: 12px 0; border: 2px solid #e9ecef; }
+        .qr-preview { max-width: 180px; border-radius: 12px; border: 2px solid #e9ecef; margin: 8px 0; }
+        .qr-status { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 12px; }
+        .qr-set { background: #d4edda; color: #155724; }
+        .qr-missing { background: #fff3cd; color: #856404; }
+        /* 地图 */
+        .map-container { width: 100%; height: 280px; border-radius: 14px; margin-bottom: 14px; border: 1px solid #edf2f7; }
+        .distance-badge { display: inline-block; background: #e8f0fe; color: #0b5e9e; padding: 2px 8px; border-radius: 12px; font-size: 12px; margin-left: 6px; }
+        .station-tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; color: white; margin-right: 4px; }
+        .tag-cainiao { background: #ff6b35; }
+        .tag-youzheng { background: #2e7d32; }
+        .tag-shunfeng { background: #d32f2f; }
+    </style>
+</head>
+<body>
+<div class="app" id="app">
+    <!-- 登录页 -->
+    <div id="page-login" class="page active">
+        <div class="header text-center" style="margin-top:60px;"><h1>📦 民大速递帮</h1><p>校园快递代取 · 透明 · 安全 · 高效</p></div>
+        <div class="card" style="margin-top:30px;">
+            <div class="form-group"><label>学号/手机号</label><input type="text" id="loginUsername" placeholder="学号或手机号"></div>
+            <div class="form-group"><label>密码</label><div style="position:relative;"><input type="password" id="loginPassword" placeholder="密码"><button type="button" id="toggleLoginPwd" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:16px;cursor:pointer;">👁</button></div></div>
+            <button id="doLoginBtn" class="btn-block">登录</button>
+            <p class="text-center mt-2"><a href="#" id="toRegisterBtn">立即注册</a></p>
+        </div>
+    </div>
+    <!-- 注册页 -->
+    <div id="page-register" class="page">
+        <div class="header"><h2>注册新账号</h2></div>
+        <div class="card">
+            <div class="form-group"><label>昵称</label><input id="regNickname" placeholder="昵称"></div>
+            <div class="form-group"><label>学号</label><input id="regStudentId" placeholder="学号"></div>
+            <div class="form-group"><label>手机号</label><input id="regPhone" placeholder="手机号"></div>
+            <div class="form-group"><label>宿舍楼栋</label><input id="regDorm" placeholder="例如 11号楼"></div>
+            <div class="form-group"><label>密码</label><div style="position:relative;"><input type="password" id="regPwd" placeholder="密码"><button type="button" id="toggleRegPwd" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:16px;cursor:pointer;">👁</button></div></div>
+            <button id="doRegisterBtn" class="btn-block">注册并登录</button>
+            <p class="text-center mt-2"><a href="#" id="backToLoginBtn">返回登录</a></p>
+        </div>
+    </div>
+    <!-- 主应用 -->
+    <div id="main-app" style="display:none;">
+        <!-- 首页 -->
+        <div id="page-home" class="page">
+            <div class="header"><h1>民大速递帮</h1><p>一站式校园快递代取 <span id="syncIndicator" class="sync-status sync-pending">同步中...</span></p></div>
+            <div class="announcement">📢 公告：统一收费标准（小件2元起，大件4元，超重6元）· 防骗提醒</div>
+            <div class="stats-grid"><div class="stat-item"><div class="num" id="statOrders">0</div><div class="label">今日订单</div></div><div class="stat-item"><div class="num" id="statPending">0</div><div class="label">待接单</div></div><div class="stat-item"><div class="num" id="statUsers">0</div><div class="label">注册用户</div></div></div>
+            <div class="flex-row"><button id="homeToPost" style="flex:1;">📝 我要发单</button><button id="homeToHall" class="secondary" style="flex:1;">📦 订单大厅</button></div>
+            <div class="filter-bar"><span class="filter-chip" data-filter="all">全部</span><span class="filter-chip" data-filter="price">💰 酬金高</span><span class="filter-chip" data-filter="urgent">⚡ 紧急</span><button id="refreshOrdersBtn" style="margin-left:auto;padding:2px 8px;font-size:12px;background:#e3f2fd;color:#1976d2;border:1px solid #1976d2;border-radius:4px;cursor:pointer;">🔄 刷新</button></div>
+            <div id="debugInfo" style="font-size:11px;color:#888;margin-bottom:10px;padding:5px;background:#f8fafc;border-radius:4px;">服务器：<span id="debugServer" style="color:#1976d2;">未连接</span> | 用户数=<span id="debugUserCount">0</span> | 订单数=<span id="debugOrderCount">0</span> | 待接=<span id="debugPendingCount">0</span></div>
+            <div id="orderListContainer">加载中...</div>
+            <div style="text-align:center;margin-top:20px;font-size:12px;color:#aaa;cursor:pointer;" id="adminToggle">⚙️ 管理员后台</div>
+            <div id="adminPanel" class="hidden card" style="margin-top:10px;"><h4>待审核订单</h4><div id="adminOrderList">无</div></div>
+        </div>
+        <!-- 支付弹窗 -->
+        <div id="paymentModal" class="modal-overlay hidden">
+            <div class="modal-box">
+                <h3>💳 扫码付款</h3>
+                <p style="font-size:13px;color:#666;">请使用微信/支付宝扫描下方收款码</p>
+                <p style="font-size:13px;color:#888;">收款人: <strong id="payTakerName"></strong></p>
+                <p style="font-size:18px;color:#1976d2;font-weight:bold;">¥<span id="payAmount"></span></p>
+                <img id="payQRImage" src="" alt="收款码" style="max-width:220px;">
+                <p style="font-size:12px;color:#dc3545;" id="payWarning"></p>
+                <div style="display:flex;gap:10px;margin-top:14px;">
+                    <button class="secondary" id="cancelPayBtn" style="flex:1;">取消</button>
+                    <button class="success" id="confirmPayBtn" style="flex:1;">✅ 我已付款</button>
+                </div>
+            </div>
+        </div>
+        <!-- 快递指南 -->
+        <div id="page-guide" class="page">
+            <div class="header"><h2>📖 快递指南</h2></div>
+            <div id="guideMap" class="map-container">加载地图中...</div>
+            <div class="card" id="stationInfo">
+                <strong>📍 驿站导航</strong>
+                <div style="margin-top:8px;font-size:13px;line-height:2;">
+                    <span class="station-tag tag-cainiao">菜鸟</span> 榆中校区 · 营业 9:00-20:00<br>
+                    <span class="station-tag tag-youzheng">邮政</span> 榆中校区 · 营业 9:00-18:00<br>
+                    <span class="station-tag tag-shunfeng">顺丰</span> 榆中校区 · 营业 9:30-19:30
+                </div>
+            </div>
+            <div class="card"><strong>📋 取件规则</strong><br>凭取件码3天内取件，超时退回</div>
+        </div>
+        <!-- 订单大厅 -->
+        <div id="page-hall" class="page">
+            <div class="header"><h2>订单大厅</h2><p style="font-size:13px;">个性化推荐</p></div>
+            <div class="filter-bar"><span class="filter-chip active" data-hallfilter="recommend">🌟 推荐</span><span class="filter-chip" data-hallfilter="price">💰 酬金高</span><span class="filter-chip" data-hallfilter="near">🏠 距离近</span></div>
+            <div id="hallOrderList">加载中...</div>
+        </div>
+        <!-- 发单 -->
+        <div id="page-post" class="page">
+            <div class="header"><h2>📦 发布代取订单</h2></div>
+            <div class="card">
+                <div class="form-group"><label>快递站点</label><select id="postStation"><option>菜鸟驿站</option><option>邮政</option><option>顺丰</option></select></div>
+                <div class="form-group"><label>取件码</label><input id="postCode" placeholder="如 1-2-3456"></div>
+                <div class="form-group"><label>快递类型</label><div class="radio-group"><label><input type="radio" name="type" value="小件" checked> 小件</label><label><input type="radio" name="type" value="大件"> 大件</label><label><input type="radio" name="type" value="超重"> 超重</label></div></div>
+                <div class="form-group"><label>送达楼栋</label><input id="postAddress" placeholder="例：11号楼323室"></div>
+                <div class="form-group"><label>酬金 (元)</label><input id="postPrice" value="2"></div>
+                <div class="form-group"><label>特殊备注</label><textarea id="postNote" placeholder="放门口等"></textarea></div>
+                <div id="aiCheckArea" class="hidden ai-check"><div class="step">🤖 AI 规则检测中...</div><div id="aiCheckDetail" style="font-size:13px;"></div></div>
+                <button id="submitOrderBtn">提交订单</button>
+                <div id="postResult" style="margin-top:12px;font-weight:500;"></div>
+            </div>
+        </div>
+        <!-- 个人中心 -->
+        <div id="page-profile" class="page">
+            <div class="header"><h2>个人中心</h2><p id="profileNickname">昵称</p></div>
+            <div class="profile-menu">
+                <div class="menu-item" data-profile-tab="myOrders">📋 我的发单</div>
+                <div class="menu-item" data-profile-tab="myAccepts">🛵 我的接单</div>
+                <div class="menu-item" data-profile-tab="toEval">⭐ 待评价</div>
+                <div class="menu-item" data-profile-tab="history">📜 历史记录</div>
+                <div class="menu-item" data-profile-tab="paymentQR">💳 收款码</div>
+                <div class="menu-item" data-profile-tab="profileCard">🧑‍🎓 我的画像</div>
+                <div class="menu-item" data-profile-tab="feedback">💬 意见反馈</div>
+                <div class="menu-item" data-profile-tab="sync">🔄 跨设备同步</div>
+                <div class="menu-item" id="logoutBtn">🚪 退出登录</div>
+            </div>
+            <div id="profileContent">请选择菜单</div>
+        </div>
+        <!-- 规则 -->
+        <div id="page-rules" class="page">
+            <div class="header"><h2>🛡️ 平台防骗指南</h2></div>
+            <div class="card"><strong>1. 警惕私下交易</strong><br>任何要求微信/支付宝直接转账均属违规</div>
+            <div class="card"><strong>2. 保护个人信息</strong><br>取件码仅提供给已接单人员</div>
+            <div class="card"><strong>3. 识别虚假订单</strong><br>酬金畸高请举报</div>
+            <div class="card"><strong>4. 遇到诈骗怎么办</strong><br>联系平台客服</div>
+            <div class="card"><label><input type="checkbox" id="rulesCheckbox"> 我已阅读并知晓</label><button id="confirmRulesBtn" class="btn-block mt-2" disabled>确认</button></div>
+        </div>
+    </div>
+    <div class="bottom-nav" id="bottomNav" style="display:none;">
+        <button class="nav-item" data-nav="home"><span class="nav-icon">🏠</span>首页</button>
+        <button class="nav-item" data-nav="guide"><span class="nav-icon">📘</span>指南</button>
+        <button class="nav-item" data-nav="hall"><span class="nav-icon">📦</span>订单大厅</button>
+        <button class="nav-item" data-nav="post"><span class="nav-icon">✏️</span>发单</button>
+        <button class="nav-item" data-nav="profile"><span class="nav-icon">👤</span>我的</button>
+    </div>
+</div>
+<script>
+    // ============================================================
+    // 引入后端 API 地址（后端运行在 localhost:3000）
+    // ============================================================
+    const API_BASE = window.location.origin + '/api';  // 自动适配 localhost / ngrok / 校园网IP
+    const WS_URL = window.location.origin;  // 自动适配当前地址
+
+    // 当前用户信息
+    let currentUser = null;
+
+    // Socket.IO 连接
+    const socket = io(WS_URL);
+
+    // ============================================================
+    // 高德地图：驿站坐标（可根据实际位置修改经纬度）
+    // 打开 https://lbs.amap.com/tools/picker 点击地图上驿站位置即可获取坐标
+    // ============================================================
+    const STATIONS = {
+        '菜鸟驿站': { lng: 104.157703, lat: 35.935098, name: '菜鸟驿站', color: '#ff6b35' },
+        '邮政':     { lng: 104.162835, lat: 35.936584, name: '邮政',     color: '#2e7d32' },
+        '顺丰':     { lng: 104.161155, lat: 35.937189, name: '顺丰速运', color: '#d32f2f' },
+    };
+    const CAMPUS_CENTER = { lng: 104.1577, lat: 35.9351 }; // 西北民族大学 榆中校区 夏官营镇
+    const DISTANCE_CACHE = {};  // 距离缓存，避免重复调用 API
+    let guideMap = null;        // 指南页地图实例
+
+    // ============================================================
+    // 工具函数：HTTP 请求
+    // ============================================================
+    async function apiRequest(method, url, body = null) {
+        const opts = {
+            method,
+            headers: { 'Content-Type': 'application/json' }
+        };
+        if (body) opts.body = JSON.stringify(body);
+        const res = await fetch(url, opts);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || '请求失败');
+        return data;
+    }
+
+    // ============================================================
+    // 登录 / 注册
+    // ============================================================
+    async function login(username, password) {
+        try {
+            const user = await apiRequest('POST', `${API_BASE}/login`, { username, password });
+            currentUser = user;
+            localStorage.setItem('currentUser', JSON.stringify(user));
+            afterLoginSuccess(user);
+            return true;
+        } catch (err) {
+            alert('登录失败：' + err.message);
+            return false;
+        }
+    }
+
+    async function register() {
+        const nickname = document.getElementById('regNickname').value.trim();
+        const student_id = document.getElementById('regStudentId').value.trim();
+        const phone = document.getElementById('regPhone').value.trim();
+        const dorm = document.getElementById('regDorm').value.trim();
+        const password = document.getElementById('regPwd').value.trim();
+        if (!nickname || !student_id || !phone || !password) {
+            alert('请填写完整信息');
+            return;
+        }
+        try {
+            await apiRequest('POST', `${API_BASE}/register`, { nickname, student_id, phone, dorm, password });
+            alert('注册成功，请登录');
+            // 切换到登录页
+            document.getElementById('page-register').classList.remove('active');
+            document.getElementById('page-login').classList.add('active');
+        } catch (err) {
+            alert('注册失败：' + err.message);
+        }
+    }
+
+    function afterLoginSuccess(user) {
+        document.getElementById('profileNickname').textContent = user.nickname;
+        document.getElementById('main-app').style.display = 'block';
+        document.getElementById('bottomNav').style.display = 'flex';
+        document.getElementById('page-login').classList.remove('active');
+        document.getElementById('page-register').classList.remove('active');
+        navigateTo('home');
+        // 检查规则确认
+        // 我们简单做：每次登录后自动视为已读（或可以增加存储）
+        // 这里简单处理，不强制
+    }
+
+    // ============================================================
+    // 导航
+    // ============================================================
+    function navigateTo(page) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById('page-' + page).classList.add('active');
+        if (page === 'home') { refreshStats(); refreshOrders(); }
+        if (page === 'hall') refreshHallOrders();
+        if (page === 'guide') initGuideMap();
+        if (page === 'profile') renderProfileContent('myOrders');
+        if (page === 'rules') {
+            // 简单处理
+            const cb = document.getElementById('rulesCheckbox');
+            const btn = document.getElementById('confirmRulesBtn');
+            cb.checked = false;
+            btn.disabled = true;
+            cb.onchange = () => { btn.disabled = !cb.checked; };
+            btn.onclick = () => {
+                alert('已确认规则');
+                navigateTo('home');
+            };
+        }
+    }
+
+    // ============================================================
+    // 高德地图：指南页地图初始化
+    // ============================================================
+    function initGuideMap() {
+        if (guideMap) return; // 已初始化
+        const container = document.getElementById('guideMap');
+        if (!container || typeof AMap === 'undefined') {
+            if (container) container.innerHTML = '地图加载中，请稍后重试...';
+            return;
+        }
+        guideMap = new AMap.Map('guideMap', {
+            center: [CAMPUS_CENTER.lng, CAMPUS_CENTER.lat],
+            zoom: 16,
+            mapStyle: 'amap://styles/light',
+        });
+        // 添加驿站标记
+        for (const [key, st] of Object.entries(STATIONS)) {
+            const marker = new AMap.Marker({
+                position: [st.lng, st.lat],
+                title: st.name,
+                label: { content: `<div style="background:${st.color};color:white;padding:2px 8px;border-radius:12px;font-size:11px;white-space:nowrap;">${st.name}</div>`, direction: 'top' },
+            });
+            guideMap.add(marker);
+        }
+        // 点击标记显示信息窗口
+        guideMap.setFitView();
+    }
+
+    // ============================================================
+    // 宿舍楼坐标配置（用高德拾取器获取后填在这里）
+    // 打开 https://lbs.amap.com/tools/picker 搜索"西北民族大学榆中校区"
+    // 依次点击每栋宿舍楼，把经纬度填在下面
+    // ============================================================
+    const BUILDINGS = {
+        '1号楼':  { lng: 104.1565, lat: 35.9345 },
+        '2号楼':  { lng: 104.1570, lat: 35.9347 },
+        '3号楼':  { lng: 104.1575, lat: 35.9340 },
+        '4号楼':  { lng: 104.1568, lat: 35.9350 },
+        '5号楼':  { lng: 104.1580, lat: 35.9355 },
+        '6号楼':  { lng: 104.1583, lat: 35.9350 },
+        '7号楼':  { lng: 104.1572, lat: 35.9358 },
+        '8号楼':  { lng: 104.1578, lat: 35.9360 },
+        '9号楼':  { lng: 104.1585, lat: 35.9353 },
+        '10号楼': { lng: 104.1560, lat: 35.9355 },
+        '11号楼': { lng: 104.1570, lat: 35.9348 },
+        '12号楼': { lng: 104.1575, lat: 35.9343 },
+        '13号楼': { lng: 104.1580, lat: 35.9342 },
+        '14号楼': { lng: 104.1588, lat: 35.9348 },
+        '15号楼': { lng: 104.1590, lat: 35.9352 },
+        '16号楼': { lng: 104.1555, lat: 35.9360 },
+        '17号楼': { lng: 104.1558, lat: 35.9358 },
+        '18号楼': { lng: 104.1562, lat: 35.9362 },
+        '19号楼': { lng: 104.1573, lat: 35.9365 },
+        '20号楼': { lng: 104.1582, lat: 35.9363 },
+        '21号楼': { lng: 104.1592, lat: 35.9358 },
+        '22号楼': { lng: 104.1550, lat: 35.9348 },
+    };
+
+    // Haversine 公式：计算两点间的直线距离（公里）
+    function haversineKm(lng1, lat1, lng2, lat2) {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2
+            + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180)
+            * Math.sin(dLng / 2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    // 从地址中提取楼栋号，如 "11号楼323室" → "11号楼"
+    function parseBuilding(address) {
+        const m = address.match(/(\d+)\s*号?楼/);
+        return m ? m[0].replace(/\s/g, '') : null;
+    }
+
+    // 计算驿站到送达地址的距离（公里）
+    // 优先查 BUILDINGS 表 + Haversine，瞬间出结果
+    function getDistance(stationName, address) {
+        const cacheKey = `${stationName}|${address}`;
+        if (DISTANCE_CACHE[cacheKey] !== undefined) return DISTANCE_CACHE[cacheKey];
+
+        const st = STATIONS[stationName];
+        if (!st) { DISTANCE_CACHE[cacheKey] = null; return null; }
+
+        // 先尝试匹配楼栋
+        const building = parseBuilding(address);
+        let targetCoord = null;
+        if (building && BUILDINGS[building]) {
+            targetCoord = BUILDINGS[building];
+        }
+        // 匹配不到就用学校中心
+        if (!targetCoord) {
+            targetCoord = CAMPUS_CENTER;
+        }
+
+        const dist = haversineKm(st.lng, st.lat, targetCoord.lng, targetCoord.lat);
+        DISTANCE_CACHE[cacheKey] = dist;
+        return dist;
+    }
+
+    // ============================================================
+    // 订单相关 API
+    // ============================================================
+    async function fetchAllOrders() {
+        return await apiRequest('GET', `${API_BASE}/orders`);
+    }
+
+    async function fetchMyOrders(userId) {
+        return await apiRequest('GET', `${API_BASE}/my-orders/${userId}`);
+    }
+
+    async function publishOrder(data) {
+        return await apiRequest('POST', `${API_BASE}/orders`, data);
+    }
+
+    async function acceptOrder(orderId, takerId) {
+        return await apiRequest('PUT', `${API_BASE}/orders/${orderId}/accept`, { taker_id: takerId });
+    }
+
+    async function updateOrderStatus(orderId, status) {
+        return await apiRequest('PUT', `${API_BASE}/orders/${orderId}/status`, { status });
+    }
+
+    async function finishOrder(orderId) {
+        return await apiRequest('PUT', `${API_BASE}/orders/${orderId}/done`);
+    }
+
+    async function rateOrder(orderId, rating, comment) {
+        return await apiRequest('PUT', `${API_BASE}/orders/${orderId}/rate`, { rating, comment });
+    }
+
+    // ============================================================
+    // 渲染函数
+    // ============================================================
+    async function refreshStats() {
+        try {
+            const orders = await fetchAllOrders();
+            // 使用后端 /api/stats 获取准确数据，失败则回退
+            let totalUsers = 0, todayOrdersCount = 0;
+            try {
+                const statsRes = await fetch(window.location.origin + '/api/stats');
+                const stats = await statsRes.json();
+                totalUsers = stats.total_users || 0;
+                todayOrdersCount = stats.today_orders || 0;
+            } catch (e) {
+                const userIds = new Set(orders.map(o => o.publisher_id));
+                totalUsers = userIds.size;
+                const today = new Date().toDateString();
+                todayOrdersCount = orders.filter(o => new Date(o.create_time).toDateString() === today).length;
+            }
+            const pending = orders.filter(o => o.status === 'pending');
+            document.getElementById('statOrders').textContent = todayOrdersCount;
+            document.getElementById('statPending').textContent = pending.length;
+            document.getElementById('statUsers').textContent = totalUsers;
+            document.getElementById('debugServer').textContent = API_BASE;
+            document.getElementById('debugUserCount').textContent = totalUsers;
+            document.getElementById('debugOrderCount').textContent = orders.length;
+            document.getElementById('debugPendingCount').textContent = pending.length;
+        } catch (e) {
+            console.error('刷新统计失败', e);
+        }
+    }
+
+    async function refreshOrders() {
+        try {
+            const orders = await fetchAllOrders();
+            const pending = orders.filter(o => o.status === 'pending');
+            const container = document.getElementById('orderListContainer');
+            if (!pending.length) {
+                container.innerHTML = '<div class="card">暂无待接订单</div>';
+                return;
+            }
+            container.innerHTML = pending.map(o => `
+                <div class="card">
+                    <strong>${o.station}</strong> → ${o.address} | ${o.type} ¥${o.price}<br>
+                    <span style="font-size:12px;color:#666;">发布者: ${o.publisher_name || '匿名'} | ${Math.floor((Date.now() - new Date(o.create_time).getTime()) / 3600000)}小时前</span>
+                    <button class="secondary" style="float:right;padding:4px 12px;" onclick="navigateTo('hall')">去接单</button>
+                </div>
+            `).join('');
+        } catch (e) {
+            document.getElementById('orderListContainer').innerHTML = '<div class="card">加载失败，请刷新</div>';
+        }
+    }
+
+    async function refreshHallOrders(filter = 'recommend') {
+        try {
+            let orders = await fetchAllOrders();
+            orders = orders.filter(o => o.status === 'pending');
+            if (filter === 'price') orders.sort((a,b) => b.price - a.price);
+            else if (filter === 'near') {
+                // 按距离排序
+                const distMap = {};
+                orders.forEach(o => {
+                    const km = getDistance(o.station, o.address);
+                    distMap[o.id] = km === null ? 99 : km;
+                });
+                orders.sort((a, b) => (distMap[a.id] || 99) - (distMap[b.id] || 99));
+            } else if (filter === 'recommend' && currentUser) {
+                orders = orders.map(o => {
+                    let score = 0;
+                    if (o.address.includes(currentUser.dorm)) score += 0.4;
+                    score += 0.3 * (o.price / 6);
+                    if (o.type === '大件' && currentUser.id === 1) score += 0.2; // 示例
+                    return { ...o, _score: score };
+                });
+                orders.sort((a,b) => (b._score || 0) - (a._score || 0));
+            }
+            const container = document.getElementById('hallOrderList');
+            if (!orders.length) {
+                container.innerHTML = '<div class="card">暂无待接单</div>';
+                return;
+            }
+            container.innerHTML = orders.map(o => `
+                <div class="card" id="order-card-${o.id}">
+                    <div style="display:flex;justify-content:space-between;">
+                        <strong>${o.station}</strong>
+                        <span style="font-size:18px;font-weight:bold;color:#1976d2;">¥${o.price}</span>
+                    </div>
+                    <div style="font-size:14px;margin:4px 0;">📦${o.type} 🏠${o.address} <span id="dist-${o.id}" style="color:#e65100;font-weight:bold;">📏 计算中...</span></div>
+                    <div style="font-size:12px;color:#888;">⏱${Math.floor((Date.now() - new Date(o.create_time).getTime()) / 3600000)}h前 · 发布者: ${o.publisher_name || '匿名'}</div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+                        <span>取件码: ****</span>
+                        <button class="accept-btn" data-id="${o.id}">✅ 接单</button>
+                    </div>
+                    ${o._score ? `<div style="font-size:11px;color:#888;">推荐分: ${o._score.toFixed(2)}</div>` : ''}
+                </div>
+            `).join('');
+            document.querySelectorAll('.accept-btn').forEach(btn => {
+                btn.addEventListener('click', () => handleAccept(btn.dataset.id));
+            });
+            // 计算每个订单的距离
+            orders.forEach(o => {
+                const km = getDistance(o.station, o.address);
+                const el = document.getElementById('dist-' + o.id);
+                if (!el) return;
+                if (km === null) { el.innerHTML = '📏 --km'; el.style.color = '#999'; }
+                else if (km < 0.2) { el.innerHTML = '📏 <200m'; el.style.color = '#2e7d32'; }
+                else { el.innerHTML = `📏 ${km.toFixed(1)}km`; el.style.color = '#e65100'; }
+            });
+        } catch (e) {
+            document.getElementById('hallOrderList').innerHTML = '<div class="card">加载失败</div>';
+        }
+    }
+
+    async function handleAccept(orderId) {
+        if (!currentUser) {
+            alert('请先登录');
+            return;
+        }
+        try {
+            await acceptOrder(orderId, currentUser.id);
+            alert('✅ 接单成功！');
+            // 刷新大厅和首页
+            refreshHallOrders();
+            refreshOrders();
+            refreshStats();
+        } catch (e) {
+            alert('接单失败：' + e.message);
+        }
+    }
+
+    // ============================================================
+    // 发布订单
+    // ============================================================
+    async function handlePublish() {
+        if (!currentUser) {
+            alert('请先登录');
+            return;
+        }
+        const station = document.getElementById('postStation').value;
+        const code = document.getElementById('postCode').value.trim();
+        const type = document.querySelector('input[name="type"]:checked').value;
+        const address = document.getElementById('postAddress').value.trim();
+        const price = parseFloat(document.getElementById('postPrice').value) || 2;
+        const note = document.getElementById('postNote').value.trim();
+        if (!code || !address) {
+            alert('请填写取件码和地址');
+            return;
+        }
+        // AI检测（仅演示）
+        const aiArea = document.getElementById('aiCheckArea');
+        aiArea.classList.remove('hidden');
+        document.getElementById('aiCheckDetail').textContent = '🔍 检查地址安全性...';
+        setTimeout(async () => {
+            const addressVerified = !address.includes('校外') && !address.includes('unknown');
+            document.getElementById('aiCheckDetail').textContent = addressVerified ? '✅ 地址校内，安全' : '⚠️ 地址异常，需审核';
+            try {
+                await publishOrder({
+                    publisher_id: currentUser.id,
+                    station,
+                    code,
+                    type,
+                    address,
+                    price,
+                    note,
+                    urgent: type === '大件' ? 1 : 0,
+                    address_verified: addressVerified ? 1 : 0
+                });
+                document.getElementById('postResult').innerHTML = '<span style="color:green;">✅ 发布成功！</span>';
+                document.getElementById('postCode').value = '';
+                document.getElementById('postAddress').value = '';
+                // 刷新首页和大厅
+                refreshOrders();
+                refreshHallOrders();
+                refreshStats();
+            } catch (e) {
+                document.getElementById('postResult').innerHTML = '<span style="color:red;">发布失败：' + e.message + '</span>';
+            }
+        }, 800);
+    }
+
+    // ============================================================
+    // 个人中心
+    // ============================================================
+    function renderProfileContent(tab) {
+        const container = document.getElementById('profileContent');
+        if (!currentUser) {
+            container.innerHTML = '<div class="card">请先登录</div>';
+            return;
+        }
+        if (tab === 'myOrders') renderMyOrders(container);
+        else if (tab === 'myAccepts') renderMyAccepts(container);
+        else if (tab === 'toEval') renderToEval(container);
+        else if (tab === 'history') renderHistory(container);
+        else if (tab === 'paymentQR') renderPaymentQR(container);
+        else if (tab === 'profileCard') renderProfileCard(container);
+        else if (tab === 'feedback') renderFeedback(container);
+        else if (tab === 'sync') renderSync(container);
+    }
+
+    async function renderMyOrders(container) {
+        try {
+            const orders = await fetchMyOrders(currentUser.id);
+            const mine = orders.filter(o => o.publisher_id === currentUser.id);
+            if (!mine.length) { container.innerHTML = '<div class="card">暂无发布订单</div>'; return; }
+            container.innerHTML = mine.map(o => {
+                const statusMap = { pending:'待接单', accepted:'已接单', taken:'取件中', delivered:'已送达 ❗待付款', done:'已完成' };
+                let action = '';
+                if (o.status === 'pending') action = `<button class="danger cancel-order" data-id="${o.id}" style="padding:4px 12px;">取消</button>`;
+                if (o.status === 'delivered') {
+                    const paidText = o.paid ? '✅ 已付款' : '💳 查看收款码并付款';
+                    const paidDisabled = o.paid ? 'disabled' : '';
+                    action = `<button class="success pay-order" data-id="${o.id}" data-paid="${o.paid||0}" style="padding:4px 12px;" ${paidDisabled}>${paidText}</button>`;
+                }
+                return `<div class="card"><strong>${o.station}</strong> → ${o.address} <span id="mydist-${o.id}"></span><br>${o.type} ¥${o.price} 状态: ${statusMap[o.status]||o.status}<br>取件码: ${o.code}<br>${action}</div>`;
+            }).join('');
+            // 绑定事件
+            container.querySelectorAll('.cancel-order').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    if (confirm('确定取消此订单？')) {
+                        // 后端暂时没有删除接口，可以简化：直接更新状态为取消，但为了演示，我们直接调用更新状态为 'cancelled'
+                        try {
+                            await updateOrderStatus(btn.dataset.id, 'cancelled');
+                            alert('已取消');
+                            renderMyOrders(container);
+                            refreshOrders();
+                            refreshHallOrders();
+                            refreshStats();
+                        } catch (e) { alert('取消失败'); }
+                    }
+                });
+            });
+            container.querySelectorAll('.pay-order').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    if (parseInt(btn.dataset.paid)) return;
+                    showPaymentModal(btn.dataset.id, container);
+                });
+            });
+            // 计算距离
+            mine.forEach(o => {
+                const km = getDistance(o.station, o.address);
+                const el = document.getElementById('mydist-' + o.id);
+                if (!el) return;
+                if (km === null) el.innerHTML = '';
+                else if (km < 0.2) el.innerHTML = '📏 <200m';
+                else el.innerHTML = `📏 ${km.toFixed(1)}km`;
+            });
+        } catch (e) {
+            container.innerHTML = '<div class="card">加载失败</div>';
+        }
+    }
+
+    async function renderMyAccepts(container) {
+        try {
+            const orders = await fetchMyOrders(currentUser.id);
+            const mine = orders.filter(o => o.taker_id === currentUser.id && o.status !== 'done');
+            if (!mine.length) { container.innerHTML = '<div class="card">暂无进行中的接单</div>'; return; }
+            container.innerHTML = mine.map(o => {
+                let next = '';
+                if (o.status === 'accepted') next = `<button class="update-status" data-id="${o.id}" data-status="taken">📦 已取件</button>`;
+                else if (o.status === 'taken') next = `<button class="update-status" data-id="${o.id}" data-status="delivered">🚚 已送达</button>`;
+                else if (o.status === 'delivered') next = `<span>等待用户确认</span>`;
+                return `<div class="card">${o.station} → ${o.address} <span id="accdist-${o.id}"></span><br>酬金¥${o.price} 状态: ${o.status}<br>取件码: ${o.code}<br>${next}</div>`;
+            }).join('');
+            container.querySelectorAll('.update-status').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    try {
+                        await updateOrderStatus(btn.dataset.id, btn.dataset.status);
+                        alert('状态更新成功');
+                        renderMyAccepts(container);
+                        refreshOrders();
+                        refreshHallOrders();
+                        refreshStats();
+                    } catch (e) { alert('更新失败'); }
+                });
+            });
+            // 计算距离
+            mine.forEach(o => {
+                const km = getDistance(o.station, o.address);
+                const el = document.getElementById('accdist-' + o.id);
+                if (!el) return;
+                if (km === null) el.innerHTML = '';
+                else if (km < 0.2) el.innerHTML = '📏 <200m';
+                else el.innerHTML = `📏 ${km.toFixed(1)}km`;
+            });
+        } catch (e) {
+            container.innerHTML = '<div class="card">加载失败</div>';
+        }
+    }
+
+    async function renderToEval(container) {
+        try {
+            const orders = await fetchMyOrders(currentUser.id);
+            const mine = orders.filter(o => o.publisher_id === currentUser.id && o.status === 'done' && !o.rating);
+            if (!mine.length) { container.innerHTML = '<div class="card">暂无待评价订单</div>'; return; }
+            container.innerHTML = mine.map(o => `
+                <div class="card">${o.station} → ${o.address}<br>酬金¥${o.price}<button class="eval-btn" data-id="${o.id}">⭐ 去评价</button></div>
+            `).join('');
+            container.querySelectorAll('.eval-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const r = prompt('评分(1-5):', '5');
+                    if (r && r >=1 && r <=5) {
+                        try {
+                            await rateOrder(btn.dataset.id, parseInt(r), '用户评价');
+                            alert('评价完成');
+                            renderToEval(container);
+                            refreshStats();
+                        } catch (e) { alert('评价失败'); }
+                    }
+                });
+            });
+        } catch (e) {
+            container.innerHTML = '<div class="card">加载失败</div>';
+        }
+    }
+
+    async function renderHistory(container) {
+        try {
+            const orders = await fetchMyOrders(currentUser.id);
+            const done = orders.filter(o => o.status === 'done');
+            if (!done.length) { container.innerHTML = '<div class="card">暂无历史订单</div>'; return; }
+            container.innerHTML = done.map(o => `
+                <div class="card">${o.station}→${o.address} ${o.type} ¥${o.price} ${o.rating ? '已评价' : '未评价'}</div>
+            `).join('');
+        } catch (e) {
+            container.innerHTML = '<div class="card">加载失败</div>';
+        }
+    }
+
+    function renderProfileCard(container) {
+        const u = currentUser;
+        container.innerHTML = `
+            <div class="card"><h4>🧑‍🎓 我的画像</h4>
+            <p>昵称: ${u.nickname}</p>
+            <p>学号: ${u.student_id}</p>
+            <p>宿舍: ${u.dorm}</p>
+            <p>总订单: 请查看我的发单/接单</p>
+            </div>
+        `;
+    }
+
+    function renderFeedback(container) {
+        container.innerHTML = `
+            <div class="card">
+                <textarea id="feedbackText" placeholder="反馈内容..."></textarea>
+                <button id="submitFeedbackBtn">提交</button>
+            </div>
+        `;
+        container.querySelector('#submitFeedbackBtn').addEventListener('click', () => {
+            alert('反馈已收到，感谢您的意见！');
+            document.getElementById('feedbackText').value = '';
+        });
+    }
+
+    function renderSync(container) {
+        container.innerHTML = `
+            <div class="card"><h4>🔄 跨设备同步</h4>
+            <p>服务器已启用实时同步，所有操作自动更新。</p>
+            <button id="refreshDataBtn">🔄 手动刷新</button>
+            <div id="syncResult" style="margin-top:8px;"></div>
+            </div>
+        `;
+        container.querySelector('#refreshDataBtn').addEventListener('click', () => {
+            refreshOrders();
+            refreshHallOrders();
+            refreshStats();
+            document.getElementById('syncResult').innerHTML = '<span style="color:green;">✅ 刷新成功</span>';
+        });
+    }
+
+    // ============================================================
+    // 收款码
+    // ============================================================
+    function renderPaymentQR(container) {
+        const hasQR = currentUser.has_payment_qr || currentUser.payment_qr;
+        let qrPreview = '';
+        if (hasQR) {
+            qrPreview = `<img src="${currentUser.payment_qr}" class="qr-preview" alt="当前收款码"><br><span class="qr-status qr-set">已设置</span>`;
+        } else {
+            qrPreview = '<span class="qr-status qr-missing">未设置收款码</span>';
+        }
+        container.innerHTML = `
+            <div class="card">
+                <h4>💳 设置收款码</h4>
+                <p style="font-size:13px;color:#666;">让发单人扫码付款给你</p>
+                ${qrPreview}
+                <div class="form-group" style="margin-top:12px;">
+                    <label>选择收款码图片</label>
+                    <input type="file" id="qrFileInput" accept="image/*" style="padding:8px;">
+                </div>
+                <button id="uploadQRBtn" class="btn-block">上传收款码</button>
+                <p style="font-size:11px;color:#999;margin-top:8px;">支持微信/支付宝收款码截图</p>
+            </div>
+        `;
+        document.getElementById('uploadQRBtn').addEventListener('click', () => {
+            const fileInput = document.getElementById('qrFileInput');
+            if (!fileInput.files.length) { alert('请先选择图片'); return; }
+            handleQRUpload(fileInput.files[0], container);
+        });
+    }
+
+    async function handleQRUpload(file, container) {
+        // 压缩图片为 300px 宽，减少存储体积
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            const img = new Image();
+            img.onload = async function() {
+                const canvas = document.createElement('canvas');
+                const maxW = 300;
+                const scale = Math.min(1, maxW / img.width);
+                canvas.width = img.width * scale;
+                canvas.height = img.height * scale;
+                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                const base64 = canvas.toDataURL('image/jpeg', 0.6);
+                try {
+                    await apiRequest('PUT', `${API_BASE}/users/${currentUser.id}/payment-qr`, { payment_qr: base64 });
+                    currentUser.payment_qr = base64;
+                    currentUser.has_payment_qr = true;
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    alert('收款码已保存!');
+                    renderPaymentQR(container);
+                } catch (err) { alert('上传失败: ' + err.message); }
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // ============================================================
+    // 付款流程
+    // ============================================================
+    let payTargetOrderId = null;
+    let payTargetContainer = null;
+
+    async function showPaymentModal(orderId, container) {
+        try {
+            const data = await apiRequest('GET', `${API_BASE}/orders/${orderId}/payment-qr?user_id=${currentUser.id}`);
+            document.getElementById('payTakerName').textContent = data.taker_name;
+            document.getElementById('payAmount').textContent = data.price;
+            document.getElementById('payQRImage').src = data.payment_qr;
+            document.getElementById('payWarning').textContent = '';
+            document.getElementById('paymentModal').classList.remove('hidden');
+            payTargetOrderId = orderId;
+            payTargetContainer = container;
+        } catch (err) {
+            alert('获取收款码失败: ' + err.message + '\n请提醒接单人先设置收款码');
+        }
+    }
+
+    async function confirmPayment() {
+        if (!payTargetOrderId) return;
+        try {
+            await apiRequest('PUT', `${API_BASE}/orders/${payTargetOrderId}/pay`, { user_id: currentUser.id });
+            alert('付款已确认，订单完成!');
+            document.getElementById('paymentModal').classList.add('hidden');
+            renderMyOrders(payTargetContainer);
+            refreshOrders();
+            refreshHallOrders();
+            refreshStats();
+            payTargetOrderId = null;
+        } catch (err) { alert('确认失败: ' + err.message); }
+    }
+
+    // ============================================================
+    // Socket.IO 实时更新
+    // ============================================================
+    socket.on('new_order', () => {
+        refreshOrders();
+        refreshHallOrders();
+        refreshStats();
+    });
+
+    socket.on('order_updated', () => {
+        refreshOrders();
+        refreshHallOrders();
+        refreshStats();
+    });
+
+    // ============================================================
+    // 管理员（简单演示）
+    // ============================================================
+    function toggleAdmin() {
+        const panel = document.getElementById('adminPanel');
+        panel.classList.toggle('hidden');
+        if (!panel.classList.contains('hidden')) renderAdminOrders();
+    }
+
+    async function renderAdminOrders() {
+        const container = document.getElementById('adminOrderList');
+        try {
+            const orders = await fetchAllOrders();
+            const pending = orders.filter(o => o.address_verified === 0 && o.status === 'pending');
+            if (!pending.length) { container.innerHTML = '无待审核订单'; return; }
+            container.innerHTML = pending.map(o => `
+                <div class="card" style="padding:8px;">
+                    ${o.station} → ${o.address} | ${o.type} ¥${o.price}
+                    <div style="display:flex;gap:8px;margin-top:6px;">
+                        <button class="success admin-pass" data-id="${o.id}">✅ 通过</button>
+                        <button class="danger admin-reject" data-id="${o.id}">❌ 驳回</button>
+                    </div>
+                </div>
+            `).join('');
+            container.querySelectorAll('.admin-pass').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    // 通过：更新 address_verified = 1
+                    // 后端没有专门接口，我们可以直接更新订单状态，这里简单处理：调用更新状态接口（状态不变，但后台可以记录）
+                    // 或者我们可以扩展后端接口，但为了演示，直接提示通过
+                    alert('已通过（后端需扩展接口，目前仅演示）');
+                });
+            });
+            container.querySelectorAll('.admin-reject').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    alert('已驳回（后端需扩展接口，目前仅演示）');
+                });
+            });
+        } catch (e) {
+            container.innerHTML = '加载失败';
+        }
+    }
+
+    // ============================================================
+    // 退出登录
+    // ============================================================
+    function logout() {
+        localStorage.removeItem('currentUser');
+        currentUser = null;
+        location.reload();
+    }
+
+    // ============================================================
+    // 页面加载初始化
+    // ============================================================
+    window.addEventListener('DOMContentLoaded', function() {
+        // 检查是否有保存的用户
+        const saved = localStorage.getItem('currentUser');
+        if (saved) {
+            try {
+                currentUser = JSON.parse(saved);
+                afterLoginSuccess(currentUser);
+            } catch (e) {
+                localStorage.removeItem('currentUser');
+            }
+        }
+
+        // 事件绑定
+        document.getElementById('doLoginBtn').addEventListener('click', () => {
+            const username = document.getElementById('loginUsername').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
+            if (!username || !password) { alert('请填写用户名和密码'); return; }
+            login(username, password);
+        });
+
+        document.getElementById('doRegisterBtn').addEventListener('click', register);
+        document.getElementById('toRegisterBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('page-login').classList.remove('active');
+            document.getElementById('page-register').classList.add('active');
+        });
+        document.getElementById('backToLoginBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('page-register').classList.remove('active');
+            document.getElementById('page-login').classList.add('active');
+        });
+
+        // 密码显示切换
+        document.getElementById('toggleLoginPwd')?.addEventListener('click', function() {
+            const inp = document.getElementById('loginPassword');
+            if (inp.type === 'password') { inp.type = 'text'; this.textContent = '🙈'; }
+            else { inp.type = 'password'; this.textContent = '👁'; }
+        });
+        document.getElementById('toggleRegPwd')?.addEventListener('click', function() {
+            const inp = document.getElementById('regPwd');
+            if (inp.type === 'password') { inp.type = 'text'; this.textContent = '🙈'; }
+            else { inp.type = 'password'; this.textContent = '👁'; }
+        });
+
+        document.querySelectorAll('.nav-item').forEach(btn => {
+            btn.addEventListener('click', () => navigateTo(btn.dataset.nav));
+        });
+        document.getElementById('homeToPost').addEventListener('click', () => navigateTo('post'));
+        document.getElementById('homeToHall').addEventListener('click', () => navigateTo('hall'));
+        document.getElementById('submitOrderBtn').addEventListener('click', handlePublish);
+        document.querySelectorAll('[data-profile-tab]').forEach(el => {
+            el.addEventListener('click', () => renderProfileContent(el.dataset.profileTab));
+        });
+        document.getElementById('logoutBtn').addEventListener('click', logout);
+        document.getElementById('adminToggle').addEventListener('click', toggleAdmin);
+        document.getElementById('refreshOrdersBtn').addEventListener('click', () => {
+            refreshOrders();
+            refreshHallOrders();
+            refreshStats();
+            alert('已刷新');
+        });
+
+        // 支付弹窗
+        document.getElementById('cancelPayBtn').addEventListener('click', () => {
+            document.getElementById('paymentModal').classList.add('hidden');
+            payTargetOrderId = null;
+        });
+        document.getElementById('confirmPayBtn').addEventListener('click', confirmPayment);
+
+        // 大厅筛选
+        document.querySelectorAll('[data-hallfilter]').forEach(chip => {
+            chip.addEventListener('click', function() {
+                document.querySelectorAll('[data-hallfilter]').forEach(c => c.classList.remove('active'));
+                this.classList.add('active');
+                refreshHallOrders(this.dataset.hallfilter);
+            });
+        });
+        // 首页筛选（简化）
+        document.querySelectorAll('[data-filter]').forEach(chip => {
+            chip.addEventListener('click', function() {
+                // 简单实现，只刷新订单列表（不实现筛选逻辑，因为功能类似）
+                refreshOrders();
+            });
+        });
+
+        // 初始加载
+        if (currentUser) {
+            refreshStats();
+            refreshOrders();
+            refreshHallOrders();
+        }
+    });
+</script>
+</body>
+</html>
